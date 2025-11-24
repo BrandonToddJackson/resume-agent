@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { createInterface } from 'readline';
+import Firecrawl from '@mendable/firecrawl-js';
 import { config } from './config.js';
 import {
   getResumeText,
@@ -9,7 +10,7 @@ import {
   getRevisionContent,
 } from './googleDrive.js';
 import { getResumeReplacements } from './groqClient.js';
-import type { VersionLogEntry, Revision } from './types.js';
+import type { VersionLogEntry } from './types.js';
 
 const VERSION_LOG_FILE = 'resume_versions.json';
 
@@ -47,12 +48,90 @@ function appendVersionLog(entry: VersionLogEntry): void {
 }
 
 /**
+ * Fetch job description from URL using Firecrawl API
+ */
+async function fetchJobDescriptionFromUrl(url: string): Promise<string> {
+  // Validate URL format
+  try {
+    new URL(url);
+  } catch (error) {
+    throw new Error(`Invalid URL format: ${url}`);
+  }
+
+  // Check if API key is configured
+  if (!config.FIRECRAWL_API_KEY) {
+    throw new Error(
+      'FIRECRAWL_API_KEY is required for URL scraping. Please add it to your .env file.'
+    );
+  }
+
+  console.log(`Fetching job description from URL: ${url}`);
+  
+  try {
+    const firecrawl = new Firecrawl({ apiKey: config.FIRECRAWL_API_KEY });
+    const response = await firecrawl.scrapeUrl(url, {
+      formats: ['markdown'],
+    });
+
+    // Check if response is an error
+    if ('error' in response && response.error) {
+      throw new Error(response.error);
+    }
+
+    // Check if response has success flag and markdown content
+    if (!('success' in response) || !response.success) {
+      throw new Error('Scrape operation was not successful');
+    }
+
+    if (!response.markdown) {
+      throw new Error('No markdown content extracted from URL');
+    }
+
+    let markdownText = response.markdown.trim();
+    
+    // Clean up markdown: remove image references (not useful for JD analysis)
+    markdownText = markdownText.replace(/!\[.*?\]\([^)]+\)/g, '');
+    
+    // Remove multiple consecutive newlines/whitespace
+    markdownText = markdownText.replace(/\n{3,}/g, '\n\n').trim();
+    
+    if (markdownText.length === 0) {
+      throw new Error('Extracted content is empty after cleaning');
+    }
+
+    console.log(`Successfully extracted ${markdownText.length} characters from URL`);
+    return markdownText;
+  } catch (error) {
+    if (error instanceof Error) {
+      // Provide clearer error messages
+      if (error.message.includes('API key') || error.message.includes('401')) {
+        throw new Error('Invalid or missing Firecrawl API key. Please check your FIRECRAWL_API_KEY in .env');
+      }
+      if (error.message.includes('404') || error.message.includes('not found')) {
+        throw new Error(`URL not found: ${url}`);
+      }
+      if (error.message.includes('rate limit') || error.message.includes('429')) {
+        throw new Error('Firecrawl API rate limit exceeded. Please try again later.');
+      }
+      throw new Error(`Failed to scrape URL: ${error.message}`);
+    }
+    throw new Error(`Failed to scrape URL: ${String(error)}`);
+  }
+}
+
+/**
  * Get job description from command line args or file
  */
 async function getJobDescription(): Promise<string> {
   const args = process.argv.slice(2);
   const jdIndex = args.indexOf('--jd');
   const jdFileIndex = args.indexOf('--jd-file');
+  const jdUrlIndex = args.indexOf('--jd-url');
+
+  if (jdUrlIndex !== -1 && args[jdUrlIndex + 1]) {
+    const url = args[jdUrlIndex + 1];
+    return await fetchJobDescriptionFromUrl(url);
+  }
 
   if (jdIndex !== -1) {
     // Collect all words after --jd until next flag (starts with --) or end
@@ -294,6 +373,7 @@ async function main(): Promise<void> {
         console.log('Usage:');
         console.log('  npm start -- update --jd "job description text" [--dry-run]');
         console.log('  npm start -- update --jd-file path/to/jd.txt [--dry-run]');
+        console.log('  npm start -- update --jd-url "https://jobs.company.com/position" [--dry-run]');
         console.log('  npm start list');
         console.log('  npm start revert <index|revisionId>');
         console.log('');

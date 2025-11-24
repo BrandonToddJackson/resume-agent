@@ -18,6 +18,7 @@ cp .env.example .env
 - `GROQ_API_KEY`: Your Groq API key
 - `GOOGLE_APPLICATION_CREDENTIALS`: Path to Google service account JSON key
 - `RESUME_FILE_ID`: Your Google Doc file ID (from URL)
+- `FIRECRAWL_API_KEY`: Your Firecrawl API key (optional, required for `--jd-url` feature)
 
 4. Share your Google Doc with the service account email (found in the JSON key file) as Editor.
 
@@ -28,11 +29,13 @@ cp .env.example .env
 # Use -- after npm start to pass arguments correctly
 npm start -- update --jd "Software engineer with TypeScript experience"
 npm start -- update --jd-file path/to/jd.txt
+npm start -- update --jd-url "https://jobs.company.com/ai-engineer"
 npm start -- update --jd "job description text" --dry-run
 
 # Alternative: Call tsx directly (no -- needed)
 npx tsx src/main.ts update --jd "Software engineer with TypeScript experience"
 npx tsx src/main.ts update --jd-file path/to/jd.txt
+npx tsx src/main.ts update --jd-url "https://jobs.company.com/ai-engineer"
 npx tsx src/main.ts update --jd "job description text" --dry-run
 ```
 
@@ -75,18 +78,16 @@ npm start revert <revisionId>  # By revision ID
 
 ## Roadmap
 
-### Phase 1: URL-Based JD Extraction (Next)
+### Phase 1: URL-Based JD Extraction ✅ (Completed)
 **Goal**: Extract job descriptions directly from URLs
 
 **Implementation**:
-- Add `--jd-url` flag to CLI
-- Integrate Firecrawl API to scrape job posting pages
-- Convert HTML → Markdown → JD text
-- Reuse existing semantic alignment logic
+- ✅ Add `--jd-url` flag to CLI
+- ✅ Integrate Firecrawl API to scrape job posting pages
+- ✅ Convert HTML → Markdown → JD text
+- ✅ Reuse existing semantic alignment logic
 
-**Why First**: Simplest extension of current CLI, validates JD extraction before building browser integration
-
-**Example**:
+**Usage**:
 ```bash
 npm start -- update --jd-url "https://jobs.company.com/ai-engineer"
 ```

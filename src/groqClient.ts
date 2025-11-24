@@ -35,47 +35,160 @@ const AlignmentSchema = z.object({
 type AlignmentResponse = z.infer<typeof AlignmentSchema>;
 
 /**
- * Build prompt for semantic alignment with job description
+ * Extract and prioritize Responsibilities and Qualifications from job description
+ */
+function extractKeySections(jobDescription: string): {
+  responsibilities: string;
+  qualifications: string;
+  fullJD: string;
+} {
+  // Find Responsibilities section
+  const respMatch = jobDescription.match(
+    /##?\s*Responsibilities?\s*\n([\s\S]*?)(?=\n##?\s*(?:Qualifications?|Requirements?|About|Company|$))/i
+  );
+  const responsibilities = respMatch && respMatch[1] ? respMatch[1].trim() : '';
+  
+  // Find Qualifications section
+  const qualMatch = jobDescription.match(
+    /##?\s*Qualifications?\s*\n([\s\S]*?)(?=\n##?\s*(?:Responsibilities?|Requirements?|About|Company|Salary|$))/i
+  );
+  const qualifications = qualMatch && qualMatch[1] ? qualMatch[1].trim() : '';
+  
+  // If sections not found, try alternative patterns
+  const altRespMatch = !responsibilities && jobDescription.match(
+    /(?:What you'll do|Key Responsibilities|You will|You'll)\s*[:\-]?\s*\n([\s\S]*?)(?=\n(?:Qualifications?|Requirements?|What you bring|$))/i
+  );
+  const altQualMatch = !qualifications && jobDescription.match(
+    /(?:Qualifications?|Requirements?|What you bring|You have)\s*[:\-]?\s*\n([\s\S]*?)(?=\n(?:Responsibilities?|Salary|About|$))/i
+  );
+  
+  return {
+    responsibilities: responsibilities || (altRespMatch && altRespMatch[1] ? altRespMatch[1].trim() : ''),
+    qualifications: qualifications || (altQualMatch && altQualMatch[1] ? altQualMatch[1].trim() : ''),
+    fullJD: jobDescription,
+  };
+}
+
+/**
+ * Build prompt for semantic alignment with job description using first-principles approach
  */
 function buildReplacementPrompt(resumeText: string, jobDescription: string): string {
-  return `You are an expert resume consultant. Your job is to align resume bullet points with job description requirements.
+  const sections = extractKeySections(jobDescription);
+  
+  // Build prioritized JD content
+  let prioritizedJD = '';
+  if (sections.responsibilities) {
+    prioritizedJD += `## CRITICAL: RESPONSIBILITIES (Highest Priority)
+${sections.responsibilities}
 
-## JOB DESCRIPTION:
-${jobDescription}
+`;
+  }
+  if (sections.qualifications) {
+    prioritizedJD += `## CRITICAL: QUALIFICATIONS (Highest Priority)
+${sections.qualifications}
+
+`;
+  }
+  if (sections.responsibilities || sections.qualifications) {
+    prioritizedJD += `## FULL JOB DESCRIPTION (Reference)
+${sections.fullJD}`;
+  } else {
+    prioritizedJD = `## JOB DESCRIPTION:
+${jobDescription}`;
+  }
+
+  return `You are an expert resume consultant using first-principles thinking. Your goal is to show that the candidate has MANAGED SIMILAR RESPONSIBILITIES, not just add keywords.
+
+${prioritizedJD}
 
 ## CURRENT RESUME:
 ${resumeText}
 
+## FIRST-PRINCIPLES ANALYSIS:
+
+### Step 1: Identify Core Responsibilities
+From the Responsibilities section above, extract the FUNDAMENTAL DUTIES:
+- What must this person actually DO in this role?
+- What outcomes must they deliver?
+- What systems/processes must they manage?
+
+### Step 2: Map Experience to Responsibilities
+For each resume bullet, ask:
+- Does this experience demonstrate managing a SIMILAR responsibility?
+- Can this bullet be rephrased to show we've done equivalent work?
+- What's the CORE FUNCTION this bullet demonstrates?
+
+### Step 3: Rephrase to Show Responsibility Match
+Rephrase bullets to:
+- Lead with the RESPONSIBILITY/DUTY (not just the action)
+- Show you've managed similar outcomes
+- Use language that mirrors the JD's responsibility descriptions
+- Keep ALL facts, numbers, and achievements intact
+
+## CRITICAL RULES:
+
+1. **Responsibility-First Approach**: 
+   - Don't just add keywords at the end
+   - Rephrase to show you've managed similar responsibilities
+   - Example: If JD says "Building and scaling ML/AI systems", show your bullet demonstrates you've built and scaled systems (even if not ML/AI)
+
+2. **Word Count Constraint**: 
+   - Original and replacement must be within 5 words of each other
+   - This means REPHRASING, not adding phrases
+   - Remove less important words to make room for responsibility-focused language
+
+3. **Factual Integrity**:
+   - Keep EXACT same facts, numbers, achievements
+   - Only change HOW it's presented
+   - Never fabricate or exaggerate
+
+4. **Prioritization**:
+   - Focus on bullets that match RESPONSIBILITIES first
+   - Then match QUALIFICATIONS
+   - Ignore bullets that don't relate to core duties
+
+## EXAMPLES OF GOOD ALIGNMENT:
+
+**JD Responsibility**: "Building and scaling advanced ML/AI systems that power core products"
+
+**Bad (just adding keywords)**:
+- Original: "Built two full-stack applications"
+- Bad: "Built two full-stack applications, demonstrating experience with ML/AI systems" ❌
+
+**Good (showing responsibility match)**:
+- Original: "Built two full-stack applications integrated with Stripe, generating $80K in first 40 days"
+- Good: "Built and scaled two full-stack AI applications integrated with Stripe, generating $80K in first 40 days and powering core product features" ✅
+- Why: Shows "building and scaling" (the responsibility) and "powering products" (the outcome)
+
+**JD Responsibility**: "Driving impact at scale by improving distributed training, serving, and ML operations"
+
+**Bad (just adding keywords)**:
+- Original: "Delivered database migration 3 months early"
+- Bad: "Delivered database migration 3 months early, utilizing distributed systems and ML operations" ❌
+
+**Good (showing responsibility match)**:
+- Original: "Delivered database migration 3 months early by scripting automated data quality fixes in Python, eliminating critical defects for 5,000+ users"
+- Good: "Improved distributed data operations at scale, delivering database migration 3 months early through automated Python scripts that eliminated critical defects for 5,000+ users" ✅
+- Why: Leads with "improved...operations at scale" (the responsibility) and shows similar outcomes
+
 ## YOUR TASK:
-1. First, identify the KEY REQUIREMENTS from the job description (skills, technologies, responsibilities)
-2. For each resume bullet point, determine which JD requirement it best demonstrates
-3. Rephrase bullet points to EMPHASIZE the relevant skill/experience that matches the JD
-4. Keep the same factual content - only change HOW it's presented to highlight JD alignment
 
-## RULES:
-- Replace FULL bullet points or sentences, not individual words
-- Keep the EXACT same facts/numbers - don't add or remove achievements
-- Original and replacement must have similar word count (within 5 words)
-- Focus on bullets that CAN be aligned with JD requirements
-- If a bullet doesn't relate to the JD, don't suggest changing it
-- Maximum 8 replacements (focus on highest-impact changes)
-
-## EXAMPLE:
-JD requires: "Experience building AI systems"
-Resume bullet: "Built two full-stack applications integrated with Stripe"
-Better version: "Architected two full-stack AI applications with payment integration"
-(Emphasizes "AI" and "architected" to match JD language)
+1. Analyze the Responsibilities section to identify core duties
+2. For each resume bullet, determine if it demonstrates managing a similar responsibility
+3. Rephrase bullets to LEAD with the responsibility/duty, showing you've done equivalent work
+4. Keep word count within 5 words of original
+5. Maximum 8 replacements (focus on highest-impact responsibility matches)
 
 Return JSON:
 {
   "replacements": [
     {
-      "original": "exact text of the original bullet or sentence from resume",
-      "replacement": "rephrased version emphasizing JD-relevant skills",
-      "jd_alignment": "which JD requirement this addresses"
+      "original": "exact text of the original bullet from resume",
+      "replacement": "rephrased version that shows you've managed similar responsibilities",
+      "jd_alignment": "specific responsibility from JD that this matches"
     }
   ],
-  "summary": ["Brief description of alignment strategy"]
+  "summary": ["Brief description of how resume demonstrates managing similar responsibilities"]
 }`;
 }
 
@@ -160,8 +273,16 @@ export async function getResumeReplacements(
   resumeText: string,
   jobDescription: string
 ): Promise<ResumeUpdateResult> {
-  console.log('Analyzing job description requirements...');
-  console.log('Identifying resume sections to align...');
+  console.log('Analyzing job description using first-principles approach...');
+  
+  const sections = extractKeySections(jobDescription);
+  if (sections.responsibilities) {
+    console.log('✓ Extracted Responsibilities section (highest priority)');
+  }
+  if (sections.qualifications) {
+    console.log('✓ Extracted Qualifications section (high priority)');
+  }
+  console.log('Mapping resume experience to core responsibilities...');
   
   const suggestions = await getAlignmentSuggestions(resumeText, jobDescription);
   
@@ -178,23 +299,23 @@ export async function getResumeReplacements(
       return false;
     }
     
-    // Word count check: replacement shouldn't be drastically different
+    // Word count check: replacement shouldn't be drastically different (within 5 words as per prompt)
     const origWords = r.original.split(/\s+/).length;
     const replWords = r.replacement.split(/\s+/).length;
-    if (Math.abs(origWords - replWords) > 8) {
-      console.log(`  Skipped: Word count difference too large (${origWords} → ${replWords})`);
+    if (Math.abs(origWords - replWords) > 5) {
+      console.log(`  Skipped: Word count difference too large (${origWords} → ${replWords}, max 5 allowed)`);
       return false;
     }
     
     return true;
   });
   
-  console.log(`\nFound ${validReplacements.length} semantic alignments`);
+  console.log(`\nFound ${validReplacements.length} responsibility-aligned updates`);
   
-  // Log JD alignment info
+  // Log JD alignment info with responsibility focus
   for (const r of validReplacements) {
     if (r.jd_alignment) {
-      console.log(`  → Aligns with: "${r.jd_alignment}"`);
+      console.log(`  → Demonstrates managing: "${r.jd_alignment}"`);
     }
   }
   
