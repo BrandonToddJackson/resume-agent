@@ -1,0 +1,35 @@
+{
+  "name": "resume-agent",
+  "version": "1.0.0",
+  "description": "CLI tool to update Google Doc resume using Groq Llama",
+  "type": "module",
+  "main": "src/main.ts",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "dev": "tsx watch src/main.ts"
+  },
+  "keywords": [
+    "resume",
+    "google-docs",
+    "groq",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "google-auth-library": "^9.0.0",
+    "googleapis": "^128.0.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

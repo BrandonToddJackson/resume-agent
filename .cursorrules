@@ -1,0 +1,29 @@
+# Cursor Rules for Resume Agent MVP
+
+## Overall Project Guidance
+- This is a Node.js/TypeScript CLI tool for updating a Google Doc resume using Groq Llama.
+- Keep everything ultra-simple: ~600-800 LOC total. Focus on MVP invariants: single Google Doc, overwrite updates, Drive revisions for versioning, local JSON for metadata.
+- Use strict TypeScript: No 'any' types. Use Zod for schema validation.
+- Error handling: Basic try-catch, console.error, no fancy logging libs.
+- No dependencies beyond: typescript, ts-node, dotenv, axios, zod, @google-cloud/google-auth-library, googleapis.
+- CLI: Use process.argv for args (no commander/cli libs). Readline for interacts.
+- Stick to the plan: One LLM call per update, conservative prompt, plain text handling.
+
+## File-Specific Rules
+- src/main.ts: CLI entry. Parse modes (update/list/revert) and args (--jd, --jd-file, --dry-run). Use console.table for outputs. Implement cross-check for desync.
+- src/googleDrive.ts: Drive v3 client with service account auth. Functions: getResumeText (export text/plain), updateResumeText (files.update), getRevisions, getRevisionContent. Handle auth via GOOGLE_APPLICATION_CREDENTIALS.
+- src/groqClient.ts: Axios to Groq API (chat/completions). Build prompt as per plan. Zod parse output. Add retry (up to 3x) on JSON errors. Model: llama3-70b-8192, temp 0.2.
+- src/config.ts: Load .env, export object with keys (GROQ_API_KEY, GOOGLE_APPLICATION_CREDENTIALS, RESUME_FILE_ID).
+- src/types.ts: Define interfaces for Revision, VersionLogEntry, etc.
+- resume_versions.json: Array of objects. Read/write with fs sync.
+
+## Coding Style
+- ES modules, async/await.
+- Short functions: <50 lines.
+- Comments: JSDoc for functions.
+- Testing: Suggest console.log tests in comments; no Jest.
+
+## Prompting Cursor
+- When generating code: "Implement [function] as per plan, with Zod and retry."
+- Avoid scope creep: No URL fetching, no diffs, no multi-file.
+- For bugs: "Debug this: [error message]. Keep it simple."

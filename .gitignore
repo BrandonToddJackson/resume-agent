@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+resume_versions.json
+*.log
+.DS_Store
+
+# Google Service Account Keys (never commit these!)
+*-*.json
+*service-account*.json
+*credentials*.json
+*key*.json
+resume-agent-479218-a49441db1acc.json
+
+# Temporary files
+*.tmp
+*.temp
+fix_typo.ts
+
