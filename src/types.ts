@@ -15,6 +15,7 @@ export interface VersionLogEntry {
   timestamp: string;
   jobTitle?: string;
   company?: string;
+  jobUrl?: string;
   changes: string[];
   isRevert: boolean;
 }

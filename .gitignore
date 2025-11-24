@@ -19,3 +19,7 @@ resume-agent-479218-a49441db1acc.json
 *.temp
 fix_typo.ts
 
+
+# Generated files
+job_opportunities.json
+jobs_queue.json

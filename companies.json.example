@@ -1,0 +1,11 @@
+[
+  {
+    "name": "Plaid",
+    "careerPageUrl": "https://plaid.com/careers",
+    "filters": {
+      "roles": ["engineer", "ml", "data", "machine learning"],
+      "locations": ["san francisco", "remote"]
+    }
+  }
+]
+

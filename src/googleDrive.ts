@@ -217,3 +217,43 @@ export async function getRevisionContent(fileId: string, revisionId: string): Pr
   return await getResumeText(fileId);
 }
 
+/**
+ * Export Google Doc revision as PDF or DOCX
+ * Note: Google Drive API doesn't support exporting specific revisions directly.
+ * This function exports the current version. To export a specific revision,
+ * you would need to temporarily restore that revision first.
+ */
+export async function exportRevision(
+  fileId: string,
+  format: 'pdf' | 'docx',
+  outputPath: string
+): Promise<void> {
+  const drive = await initializeDriveClient();
+  
+  const mimeTypes: Record<'pdf' | 'docx', string> = {
+    pdf: 'application/pdf',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  };
+  
+  const mimeType = mimeTypes[format];
+  
+  const response = await drive.files.export(
+    {
+      fileId,
+      mimeType,
+    },
+    { responseType: 'stream' }
+  );
+  
+  // Write stream to file
+  const fs = await import('fs');
+  const writeStream = fs.createWriteStream(outputPath);
+  
+  return new Promise((resolve, reject) => {
+    response.data
+      .pipe(writeStream)
+      .on('finish', resolve)
+      .on('error', reject);
+  });
+}
+
